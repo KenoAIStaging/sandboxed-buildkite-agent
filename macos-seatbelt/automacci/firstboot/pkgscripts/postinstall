@@ -16,4 +16,12 @@ chmod 644       "$TARGET/Library/LaunchDaemons/org.julialang.ci.firstboot.plist"
 chown -R root:wheel "$TARGET/private/var/juliaci"
 chmod 600 "$TARGET/private/var/juliaci/password"
 
+# When installing onto the live system ("/" — i.e. at first boot via
+# --installpackage, or a manual rescue install), launchd has already scanned
+# /Library/LaunchDaemons and won't notice the plist until the next reboot.
+# Kick it explicitly so setup starts on THIS boot.
+if [ "$TARGET" = "/" ]; then
+    launchctl load /Library/LaunchDaemons/org.julialang.ci.firstboot.plist || true
+fi
+
 exit 0
