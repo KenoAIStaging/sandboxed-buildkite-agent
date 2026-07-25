@@ -98,8 +98,18 @@ pkgbuild --root "$PAYLOAD" \
          --ownership recommended \
          "$WORK/firstboot-component.pkg"
 # startosinstall --installpackage requires a distribution ("product archive")
-# package, so wrap the component pkg:
-productbuild --package "$WORK/firstboot-component.pkg" "$WORK/firstboot.pkg"
+# package, so wrap the component pkg. NOTE: the Intel 'run' path applies the
+# pkg itself from recovery and doesn't care about signing, but the Apple
+# Silicon 'run-as' path goes through startosinstall --installpackage, which
+# silently drops packages it doesn't like — sign with a Developer ID
+# Installer identity if you have one:
+#   PKG_SIGN_ID="Developer ID Installer: <name> (<team>)"
+if [ -n "${PKG_SIGN_ID:-}" ]; then
+    productbuild --sign "$PKG_SIGN_ID" \
+        --package "$WORK/firstboot-component.pkg" "$WORK/firstboot.pkg"
+else
+    productbuild --package "$WORK/firstboot-component.pkg" "$WORK/firstboot.pkg"
+fi
 
 # ---- disk image -------------------------------------------------------------
 echo "==> Building juliaci.dmg (this copies the ~15GB installer; be patient)"

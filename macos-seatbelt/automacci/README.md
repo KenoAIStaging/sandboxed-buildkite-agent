@@ -129,9 +129,22 @@ the machine to the Buildkite queues.
   (`diskutil eraseDisk APFS "Macintosh HD" GPT diskN` + `startosinstall
   --volume`); `--eraseinstall` is only valid from a booted OS, which is why
   `run-as` (Apple Silicon path) uses it.
-- **firstboot.pkg rejected during install**: `--installpackage` requires
-  distribution ("product archive") packages — `build-image.sh` handles this
-  via `productbuild`; if you hand-build a package, wrap it the same way.
+- **Machine boots into Setup Assistant instead of the login window**: the
+  firstboot package didn't get applied. On Intel this happened when the pkg
+  went through `startosinstall --installpackage`, which silently drops
+  packages it doesn't vet (unsigned distribution pkgs); `run` therefore
+  applies the pkg itself with recovery's `installer` onto the erased volume
+  before invoking startosinstall — files outside the sealed system survive
+  the OS install. Rescue without reimaging: click through Setup Assistant
+  with a throwaway admin, then
+  `hdiutil mount http://<server>/juliaci.dmg`,
+  `sudo installer -pkg /Volumes/JULIACI/firstboot.pkg -target /`, reboot,
+  and later `sudo sysadminctl -deleteUser <throwaway>`.
+- **firstboot.pkg via `--installpackage` (Apple Silicon run-as path)**:
+  requires a distribution ("product archive") package — `build-image.sh`
+  wraps with `productbuild` — and startosinstall may silently drop unsigned
+  ones; set `PKG_SIGN_ID="Developer ID Installer: ..."` when building the
+  image if the AS path is used.
 - **Cmd-R doesn't enter recovery on a used T2 machine**: firmware password
   set by the previous owner; you need it (or an Apple Store) to clear it.
 - **julia user on Apple Silicon has no secure token / volume ownership**:
