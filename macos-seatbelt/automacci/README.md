@@ -49,8 +49,11 @@ Needs a mac with ~40 GB free. All steps in this directory.
    ```
 5. Serve `out/` at the `--server` URL. The server **must support HTTP range
    requests** — `python3 -m http.server` does NOT and `hdiutil` will fail
-   against it. `npx http-server out -p 80`, caddy, and nginx all work. Verify
-   (expect `206`):
+   against it. Working options: `caddy file-server --root out --listen :8000
+   --access-log` (use `--access-log`: watching requests for the dmg/pkg/Xcode
+   asset is your deployment progress bar and reveals each machine's IP),
+   `npx http-server out -p 80`, or nginx. To see who's connected without
+   logs: `lsof -nP -i :8000`. Verify range support (expect `206`):
    ```
    curl -r 0-99 -o /dev/null -s -w '%{http_code}\n' http://192.168.1.10/juliaci.dmg
    ```
