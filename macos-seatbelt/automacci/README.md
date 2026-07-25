@@ -13,11 +13,17 @@ bottom for why that was dropped.
 
 `build-image.sh` produces `juliaci.dmg` containing a full macOS installer app,
 `firstboot.pkg`, and two launch scripts (`run` for Intel, `run-as` for Apple
-Silicon). On the target, `startosinstall --eraseinstall --installpackage
-firstboot.pkg` erases the disk and installs macOS; on the first boot of the new
-system the package suppresses Setup Assistant, and a LaunchDaemon
-(`firstboot/setup.sh`) creates the `julia` user, enables SSH, disables sleep,
-fetches Xcode from your HTTP server, and runs the `scripts/` in order.
+Silicon). On the target the disk is erased and macOS installed; on the first
+boot of the new system the package suppresses Setup Assistant, and a
+LaunchDaemon (`firstboot/setup.sh`) configures the machine to match what the
+old MDS workflow + the PR #57 follow-up notes established: `julia` user
+(uid 601, zsh, admin) with auto-login (/etc/kcpassword), computer name
+`<prefix>-<serial>` (default prefix `honeycrisp`, see `--name-prefix`), SSH +
+Screen Sharing on, Wi-Fi off, all sleep/hibernation off, restart-on-power-
+failure on; it then fetches Xcode from your HTTP server and runs the
+`scripts/` in order (Xcode select/license, repo clone, Homebrew, juliaup
+release+lts, tailscale, buildbot authorized_keys), and finishes by sweeping
+`chown -R julia /Users/julia`.
 
 ## Building the image (once per macOS/Xcode combination)
 

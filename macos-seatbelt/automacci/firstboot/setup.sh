@@ -2,6 +2,8 @@
 # Julia CI first-boot setup. Delivered by firstboot.pkg and run as root by the
 # org.julialang.ci.firstboot LaunchDaemon on the first boot after deployment.
 # Logs to /var/log/juliaci-firstboot.log (tail it to watch progress).
+# Idempotent: to re-run after fixing something, reinstall the pkg (restores
+# payload + LaunchDaemon), `rm /private/var/juliaci/.done`, reboot.
 BASE=/private/var/juliaci
 exec >>/var/log/juliaci-firstboot.log 2>&1
 set -x
@@ -14,7 +16,7 @@ if [ -e "$BASE/.done" ]; then
     exit 0
 fi
 
-# config provides SERVER_URL and (optionally) XCODE_ASSET
+# config provides SERVER_URL and (optionally) XCODE_ASSET, COMPUTER_NAME_PREFIX
 . "$BASE/config"
 
 # Wait for the network (up to 10 minutes). Try the deploy server first, fall
@@ -29,20 +31,71 @@ done
 # Intel, where the installer sudos to create /usr/local directories).
 grep -q '^julia ALL' /etc/sudoers || echo 'julia ALL = NOPASSWD: ALL' >>/etc/sudoers
 
-# Create the julia user. NOTE (Apple Silicon): a user created here, before any
-# Setup Assistant user exists, may not hold a secure token / volume ownership.
-# CI doesn't need one; OS *upgrades* on such machines are easiest done by
-# redeploying this image.
+# Create the julia user (uid 601 and zsh shell match the old MDS workflow).
+# NOTE (Apple Silicon): a user created here, before any Setup Assistant user
+# exists, may not hold a secure token / volume ownership. CI doesn't need
+# one; OS *upgrades* on such machines are easiest done by redeploying.
 if ! id julia >/dev/null 2>&1; then
-    sysadminctl -addUser julia -fullName "Julia CI" -admin \
-        -password "$(cat "$BASE/password")"
+    sysadminctl -addUser julia -fullName "Julia Hub" -UID 601 -shell /bin/zsh \
+        -admin -password "$(cat "$BASE/password")"
     createhomedir -c -u julia
+fi
+
+# Auto-login as julia (CI jobs want a real GUI session; matches the MDS
+# workflow's shouldAutologin). /etc/kcpassword is the password XORed with
+# Apple's fixed 11-byte key, NUL-terminated, padded to a multiple of 12.
+# Trivially reversible by design — acceptable for CI machines, and it's what
+# every deployment tool does. Requires FileVault off (it is, fresh install).
+kcpassword_encode() {
+    local pw="$1"
+    local key=(125 137 82 35 210 188 221 234 163 185 31)
+    local out="" i c n=${#pw}
+    for (( i=0; i<n; i++ )); do
+        c=$(printf '%d' "'${pw:i:1}")
+        out+=$(printf '\\%03o' $(( c ^ key[i % 11] )))
+    done
+    out+=$(printf '\\%03o' $(( key[i % 11] )) ); i=$((i+1))
+    while (( i % 12 != 0 )); do
+        out+=$(printf '\\%03o' $(( key[i % 11] )) ); i=$((i+1))
+    done
+    printf '%b' "$out"
+}
+if [ -f "$BASE/password" ]; then
+    kcpassword_encode "$(cat "$BASE/password")" > /etc/kcpassword
+    chown root:wheel /etc/kcpassword
+    chmod 600 /etc/kcpassword
+    defaults write /Library/Preferences/com.apple.loginwindow autoLoginUser -string julia
 fi
 rm -f "$BASE/password"
 
-# SSH on, never sleep, restart after power failure.
+# Computer name: <prefix>-<serial>, matching the MDS workflow's
+# honeycrisp-{{serial_number}} convention.
+SERIAL="$(ioreg -rd1 -c IOPlatformExpertDevice | awk -F'"' '/IOPlatformSerialNumber/{print $4}')"
+if [ -n "$SERIAL" ]; then
+    NAME="${COMPUTER_NAME_PREFIX:-honeycrisp}-${SERIAL}"
+    scutil --set ComputerName "$NAME"
+    scutil --set HostName "$NAME"
+    scutil --set LocalHostName "$NAME"
+fi
+
+# Remote access: SSH and Screen Sharing.
 systemsetup -setremotelogin on || launchctl load -w /System/Library/LaunchDaemons/ssh.plist
-pmset -a sleep 0 displaysleep 0 disksleep 0 autorestart 1 womp 1
+launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist || true
+
+# Never sleep, in any form; restart after power failure. caffeinate alone has
+# been seen losing to power management on macOS 15 (PR #57 discussion), hence
+# the full battery of settings; some keys don't exist on some hardware.
+pmset -a sleep 0 displaysleep 0 disksleep 0 || true
+pmset -a hibernatemode 0 || true
+pmset -a autopoweroff 0 || true
+pmset -a standby 0 || true
+pmset -a lidwake 0 || true
+pmset -a autorestart 1 womp 1 || true
+
+# CI machines are wired; kill Wi-Fi so machines can't wander onto it
+# (PR #57 discussion, staticfloat's note 3).
+WIFIDEV="$(networksetup -listallhardwareports | awk '/Wi-Fi|AirPort/{getline; print $2}')"
+[ -n "$WIFIDEV" ] && networksetup -setairportpower "$WIFIDEV" off || true
 
 # Fetch and unpack Xcode if the image was built with one.
 if [ -n "${XCODE_ASSET:-}" ] && [ ! -d /Applications/Xcode.app ]; then
@@ -62,14 +115,20 @@ if [ -n "${XCODE_ASSET:-}" ] && [ ! -d /Applications/Xcode.app ]; then
 fi
 
 # Run the setup scripts in order (00-select-xcode, 01-clone, 02-homebrew,
-# 03-juliaup). Keep going on failure — a partially set up machine that answers
-# SSH beats one that never comes up; failures are visible in the log.
+# 03-juliaup, 04-tailscale, 05-ssh-key). Keep going on failure — a partially
+# set up machine that answers SSH beats one that never comes up; failures are
+# visible in the log.
 FAILED=""
 for s in "$BASE"/scripts/*.sh; do
     bash "$s" || FAILED="$FAILED $s"
 done
-[ -n "$FAILED" ] && echo "JULIACI SETUP FAILURES:$FAILED"
 
+# The setup scripts run installers as root that occasionally leave
+# root-owned droppings in julia's home (PR #57 discussion, staticfloat's
+# note 2); sweep ownership at the end.
+chown -R julia /Users/julia || true
+
+[ -n "$FAILED" ] && echo "JULIACI SETUP FAILURES:$FAILED"
 touch "$BASE/.done"
 finish
 echo "JULIACI SETUP COMPLETE"

@@ -35,7 +35,7 @@ EOF
     exit 1
 }
 
-INSTALLER="" SERVER="" XCODE="" OUTDIR=out PKG_ONLY="" XCODE_ASSET_OVERRIDE=""
+INSTALLER="" SERVER="" XCODE="" OUTDIR=out PKG_ONLY="" XCODE_ASSET_OVERRIDE="" NAME_PREFIX=honeycrisp
 while [ $# -gt 0 ]; do
     case "$1" in
         --installer)   INSTALLER="$2"; shift 2;;
@@ -47,6 +47,9 @@ while [ $# -gt 0 ]; do
         # Xcode archive to reference in the pkg config without repacking.
         --pkg-only)    PKG_ONLY=1; shift;;
         --xcode-asset) XCODE_ASSET_OVERRIDE="$2"; shift 2;;
+        # machines name themselves <prefix>-<serial>; default matches the
+        # MDS-era honeycrisp-{{serial_number}} convention
+        --name-prefix) NAME_PREFIX="$2"; shift 2;;
         *) usage;;
     esac
 done
@@ -93,6 +96,7 @@ printf '%s' "$JULIA_PASSWORD" > "$PAYLOAD/private/var/juliaci/password"
 cat > "$PAYLOAD/private/var/juliaci/config" <<EOF
 SERVER_URL="$SERVER"
 XCODE_ASSET="$XCODE_ASSET"
+COMPUTER_NAME_PREFIX="$NAME_PREFIX"
 EOF
 chmod 755 "$PAYLOAD/private/var/juliaci/setup.sh" "$PAYLOAD"/private/var/juliaci/scripts/*.sh
 chmod 600 "$PAYLOAD/private/var/juliaci/password"

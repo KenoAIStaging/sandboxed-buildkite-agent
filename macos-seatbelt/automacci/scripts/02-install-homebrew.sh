@@ -23,6 +23,12 @@ fi
 grep -q 'brew shellenv' /Users/julia/.bash_profile || \
     (echo; echo "eval \"\$(${BREW} shellenv)\"") >> /Users/julia/.bash_profile
 
+# zsh is the login default (and julia's shell), so .zprofile needs it too
+# (PR #57 discussion, maleadt's note 2).
+sudo -i -u julia touch /Users/julia/.zprofile
+grep -q 'brew shellenv' /Users/julia/.zprofile || \
+    (echo; echo "eval \"\$(${BREW} shellenv)\"") >> /Users/julia/.zprofile
+
 # The Homebrew installer installs the Command Line Tools and switches the
 # active developer directory to them (`xcode-select --switch
 # /Library/Developer/CommandLineTools`), silently undoing 00-select-xcode.sh.
