@@ -57,6 +57,13 @@ if [ -n "${SERVER:-}" ]; then
 fi
 installer -pkg "$PKG" -target "/Volumes/Macintosh HD"
 
+# ...and ALSO via --installpackage: the OS install rebuilds /var/db, dropping
+# a pre-placed .AppleSetupDone (observed: Setup Assistant on screen while
+# firstboot ran behind it), whereas --installpackage re-runs the pkg at first
+# boot before loginwindow, restoring it in time. The recovery-time installer
+# above stays as the loud failure detector; unsigned product archives are
+# fine here (proven in the field — the earlier failure was an exec bit).
 "$INSTALLER/Contents/Resources/startosinstall" \
     --agreetolicense --nointeraction --forcequitapps \
-    --volume "/Volumes/Macintosh HD"
+    --volume "/Volumes/Macintosh HD" \
+    --installpackage "$PKG"

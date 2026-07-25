@@ -16,6 +16,11 @@ if [ -e "$BASE/.done" ]; then
     exit 0
 fi
 
+# Belt-and-suspenders: the pkg postinstall also does this, but the OS install
+# rebuilds /var/db and can drop a pre-placed copy; without it the machine
+# shows Setup Assistant while this script runs behind it.
+touch /private/var/db/.AppleSetupDone
+
 # config provides SERVER_URL and (optionally) XCODE_ASSET, COMPUTER_NAME_PREFIX
 . "$BASE/config"
 
@@ -132,3 +137,8 @@ chown -R julia /Users/julia || true
 touch "$BASE/.done"
 finish
 echo "JULIACI SETUP COMPLETE"
+
+# One reboot so loginwindow re-reads autologin/.AppleSetupDone — lands on
+# julia's desktop with no operator touches. No loop risk: .done short-
+# circuits the next run.
+reboot
