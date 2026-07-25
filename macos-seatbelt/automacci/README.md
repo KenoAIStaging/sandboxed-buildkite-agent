@@ -134,7 +134,13 @@ admin expects). The tailnet hostname defaults to the computer name,
 tailscale first if the machine was imaged before that script existed.
 
 Finally, send the IP (tailnet name) and julia password to @staticfloat to add
-the machine to the Buildkite queues.
+the machine to the Buildkite queues. That last step (documented in the
+top-level README) amounts to: a `config.toml` from
+`platforms/macos-seatbelt/config.toml.example` with the queue's runner
+groups, the Buildkite agent token into `agent/secrets/buildkite-agent-token`
+(`chmod o-rwx`), then `bin/bk enable && bin/bk start` in
+`~julia/src/sandboxed-buildkite-agent` — the token and queue conventions are
+the org-admin inputs the deployer can't self-serve.
 
 ## Troubleshooting / gotchas (hard-won, please append)
 
