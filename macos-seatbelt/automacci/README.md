@@ -146,20 +146,22 @@ the machine to the Buildkite queues.
   --volume`); `--eraseinstall` is only valid from a booted OS, which is why
   `run-as` (Apple Silicon path) uses it.
 - **Machine boots into Setup Assistant instead of the login window**: the
-  firstboot package failed — `.AppleSetupDone` never got touched. Check
-  `/var/log/install.log` on the machine for `org.julialang.ci.firstboot`.
-  Field case: PackageKit said `The file "postinstall" doesn't exist` with
-  `NSFilePosixPermissions = 420` — the script was in the pkg but not
-  executable (0644), from a checkout with lost exec bits; `build-image.sh`
-  now forces 755 on pkg scripts at build time. Failures like this are why
-  the Intel `run` applies the pkg with recovery's `installer` *before*
-  startosinstall — a broken pkg errors in front of the operator instead of
-  silently at first boot. Rescue without reimaging: click through Setup
-  Assistant with a throwaway admin, rebuild the pkg
-  (`./build-image.sh --pkg-only --server ... --xcode-asset <name>`), then
+  firstboot package failed or never ran — `.AppleSetupDone` never got
+  touched. Check for `/var/log/juliaci-firstboot.log` (absent → pkg never
+  ran) and grep `/var/log/install.log` for `org.julialang.ci.firstboot`.
+  Field cases, both fixed in the current scripts: (a) PackageKit said
+  `The file "postinstall" doesn't exist` with `NSFilePosixPermissions = 420`
+  — script in the pkg but not executable, from a checkout with lost exec
+  bits; build-image.sh now forces 755 at build time. (b) The pkg was applied
+  only from recovery onto the erased volume — the OS install creates a fresh
+  Data volume and discards pre-placed payload, so deliver via
+  `--installpackage` (recovery-time `installer` is validation only; both are
+  what `run` now does). Rescue without reimaging: click through Setup
+  Assistant with a throwaway admin (NOT named julia), then
   `curl -O http://<server>/firstboot.pkg`,
-  `sudo installer -pkg firstboot.pkg -target /`, reboot, and later
-  `sudo sysadminctl -deleteUser <throwaway>`.
+  `sudo installer -pkg firstboot.pkg -target /`, reboot (setup reboots
+  itself again when done), and later `sudo sysadminctl -deleteUser
+  <throwaway>` from the julia account.
 - **Rolling out a pkg fix without rebuilding the dmg**: build with
   `--pkg-only`, serve `out/firstboot.pkg`, and launch recovery deploys as
   `SERVER=http://<host>:<port> bash run` — `run` then prefers the served pkg

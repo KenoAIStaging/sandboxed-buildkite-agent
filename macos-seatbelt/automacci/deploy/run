@@ -41,13 +41,6 @@ fi
 
 diskutil eraseDisk APFS "Macintosh HD" GPT "$DISK"
 
-# Apply firstboot.pkg onto the erased volume ourselves rather than via
-# startosinstall --installpackage: doing it here means a broken package
-# fails loudly in front of the operator instead of silently at first boot
-# (with --installpackage, a failed pkg strands the machine in Setup
-# Assistant). Files outside the sealed system survive the OS install —
-# the same mechanism MDS uses.
-#
 # If SERVER is set, prefer a freshly served pkg over the one baked into the
 # dmg — lets pkg fixes roll out without a ~30min image rebuild:
 #     SERVER=http://<host>:<port> bash run
@@ -55,14 +48,18 @@ PKG="$VOL/firstboot.pkg"
 if [ -n "${SERVER:-}" ]; then
     curl -f -o /tmp/firstboot.pkg "${SERVER%/}/firstboot.pkg" && PKG=/tmp/firstboot.pkg
 fi
+
+# Pre-flight validation ONLY: run the pkg against the erased volume so a
+# broken package (bad archive, failing script) aborts loudly here, in front
+# of the operator. Its *effects do not persist* — the OS install creates a
+# fresh Data volume, discarding anything pre-placed (observed in the field:
+# machine came up with no trace of the payload). Delivery happens via
+# --installpackage below, which stages the pkg through the install and runs
+# it at first boot, before loginwindow. Unsigned product archives are fine
+# there (also proven in the field — the one observed failure was a
+# non-executable script, not signing).
 installer -pkg "$PKG" -target "/Volumes/Macintosh HD"
 
-# ...and ALSO via --installpackage: the OS install rebuilds /var/db, dropping
-# a pre-placed .AppleSetupDone (observed: Setup Assistant on screen while
-# firstboot ran behind it), whereas --installpackage re-runs the pkg at first
-# boot before loginwindow, restoring it in time. The recovery-time installer
-# above stays as the loud failure detector; unsigned product archives are
-# fine here (proven in the field — the earlier failure was an exec bit).
 "$INSTALLER/Contents/Resources/startosinstall" \
     --agreetolicense --nointeraction --forcequitapps \
     --volume "/Volumes/Macintosh HD" \
