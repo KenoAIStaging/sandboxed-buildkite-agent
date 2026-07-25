@@ -62,6 +62,21 @@ if [ ! -d /Users/julia ]; then
     chown -R julia:staff /Users/julia
 fi
 
+# Suppress julia's per-user first-login Setup Assistant (Apple ID, Siri,
+# privacy panes — the MDS workflow's shouldSkipPrivacySetup). Without this,
+# auto-login walks straight into those panes on first boot.
+SA_PLIST=/Users/julia/Library/Preferences/com.apple.SetupAssistant
+mkdir -p /Users/julia/Library/Preferences
+for k in DidSeeCloudSetup DidSeeSiriSetup DidSeePrivacy DidSeeAppearanceSetup \
+         DidSeeAvatarSetup DidSeeScreenTime DidSeeTouchIDSetup \
+         DidSeeAccessibility DidSeeActivationLock DidSeeApplePaySetup \
+         DidSeeTrueTonePrivacy; do
+    defaults write "$SA_PLIST" "$k" -bool true
+done
+defaults write "$SA_PLIST" LastSeenCloudProductVersion "$(sw_vers -productVersion)"
+defaults write "$SA_PLIST" LastSeenBuddyBuildVersion "$(sw_vers -buildVersion)"
+chown -R julia:staff /Users/julia/Library
+
 # Auto-login as julia (CI jobs want a real GUI session; matches the MDS
 # workflow's shouldAutologin). /etc/kcpassword is the password XORed with
 # Apple's fixed 11-byte key, NUL-terminated, padded to a multiple of 12.
