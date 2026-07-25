@@ -35,22 +35,30 @@ EOF
     exit 1
 }
 
-INSTALLER="" SERVER="" XCODE="" OUTDIR=out
+INSTALLER="" SERVER="" XCODE="" OUTDIR=out PKG_ONLY="" XCODE_ASSET_OVERRIDE=""
 while [ $# -gt 0 ]; do
     case "$1" in
-        --installer)  INSTALLER="$2"; shift 2;;
-        --server)     SERVER="${2%/}"; shift 2;;
-        --xcode)      XCODE="$2"; shift 2;;
-        --output-dir) OUTDIR="$2"; shift 2;;
+        --installer)   INSTALLER="$2"; shift 2;;
+        --server)      SERVER="${2%/}"; shift 2;;
+        --xcode)       XCODE="$2"; shift 2;;
+        --output-dir)  OUTDIR="$2"; shift 2;;
+        # Rebuild only firstboot.pkg into --output-dir (seconds, not the
+        # ~30min dmg recompress). --xcode-asset names an already-served
+        # Xcode archive to reference in the pkg config without repacking.
+        --pkg-only)    PKG_ONLY=1; shift;;
+        --xcode-asset) XCODE_ASSET_OVERRIDE="$2"; shift 2;;
         *) usage;;
     esac
 done
 
-[ -n "$INSTALLER" ] && [ -n "$SERVER" ] || usage
-[ -d "$INSTALLER" ] || { echo "error: installer app not found: $INSTALLER"; exit 1; }
-[ -x "$INSTALLER/Contents/Resources/startosinstall" ] || {
-    echo "error: $INSTALLER has no Contents/Resources/startosinstall —"
-    echo "       it must be a *full* installer app, not a stub"; exit 1; }
+[ -n "$SERVER" ] || usage
+if [ -z "$PKG_ONLY" ]; then
+    [ -n "$INSTALLER" ] || usage
+    [ -d "$INSTALLER" ] || { echo "error: installer app not found: $INSTALLER"; exit 1; }
+    [ -x "$INSTALLER/Contents/Resources/startosinstall" ] || {
+        echo "error: $INSTALLER has no Contents/Resources/startosinstall —"
+        echo "       it must be a *full* installer app, not a stub"; exit 1; }
+fi
 [ -n "${JULIA_PASSWORD:-}" ] || { echo "error: set JULIA_PASSWORD in the environment"; exit 1; }
 
 SRCDIR="$(cd "$(dirname "$0")" && pwd)"
@@ -59,8 +67,8 @@ trap 'rm -rf "$WORK"' EXIT
 mkdir -p "$OUTDIR"
 
 # ---- Xcode asset ------------------------------------------------------------
-XCODE_ASSET=""
-if [ -n "$XCODE" ]; then
+XCODE_ASSET="$XCODE_ASSET_OVERRIDE"
+if [ -n "$XCODE" ] && [ -z "$XCODE_ASSET_OVERRIDE" ]; then
     case "$XCODE" in
         *.xip)
             XCODE_ASSET="$(basename "$XCODE")"
@@ -90,8 +98,17 @@ chmod 755 "$PAYLOAD/private/var/juliaci/setup.sh" "$PAYLOAD"/private/var/juliaci
 chmod 600 "$PAYLOAD/private/var/juliaci/password"
 chmod 644 "$PAYLOAD/Library/LaunchDaemons/org.julialang.ci.firstboot.plist"
 
+# Copy pkg scripts and force the exec bit — a checkout with wrong modes must
+# not produce a pkg whose postinstall PackageKit can't run (it reports that
+# as "The file "postinstall" doesn't exist", and the machine lands in Setup
+# Assistant because .AppleSetupDone was never touched).
+PKGSCRIPTS="$WORK/pkgscripts"
+mkdir -p "$PKGSCRIPTS"
+cp "$SRCDIR"/firstboot/pkgscripts/* "$PKGSCRIPTS/"
+chmod 755 "$PKGSCRIPTS"/*
+
 pkgbuild --root "$PAYLOAD" \
-         --scripts "$SRCDIR/firstboot/pkgscripts" \
+         --scripts "$PKGSCRIPTS" \
          --identifier org.julialang.ci.firstboot \
          --version 1.0 \
          --install-location / \
@@ -109,6 +126,17 @@ if [ -n "${PKG_SIGN_ID:-}" ]; then
         --package "$WORK/firstboot-component.pkg" "$WORK/firstboot.pkg"
 else
     productbuild --package "$WORK/firstboot-component.pkg" "$WORK/firstboot.pkg"
+fi
+
+if [ -n "$PKG_ONLY" ]; then
+    cp "$WORK/firstboot.pkg" "$OUTDIR/firstboot.pkg"
+    cat <<EOF
+
+Done: $OUTDIR/firstboot.pkg (dmg untouched). Machines can use it via:
+  recovery:  SERVER=$SERVER bash run      (run fetches the fresh pkg)
+  booted OS: curl -O $SERVER/firstboot.pkg && sudo installer -pkg firstboot.pkg -target /
+EOF
+    exit 0
 fi
 
 # ---- disk image -------------------------------------------------------------

@@ -41,11 +41,20 @@ fi
 diskutil eraseDisk APFS "Macintosh HD" GPT "$DISK"
 
 # Apply firstboot.pkg onto the erased volume ourselves rather than via
-# startosinstall --installpackage: modern startosinstall silently drops
-# packages it doesn't like (e.g. unsigned ones), whereas recovery's
-# /usr/sbin/installer applies them unvetted, and files outside the sealed
-# system survive the OS install (this is what MDS does under the hood).
-installer -pkg "$VOL/firstboot.pkg" -target "/Volumes/Macintosh HD"
+# startosinstall --installpackage: doing it here means a broken package
+# fails loudly in front of the operator instead of silently at first boot
+# (with --installpackage, a failed pkg strands the machine in Setup
+# Assistant). Files outside the sealed system survive the OS install —
+# the same mechanism MDS uses.
+#
+# If SERVER is set, prefer a freshly served pkg over the one baked into the
+# dmg — lets pkg fixes roll out without a ~30min image rebuild:
+#     SERVER=http://<host>:<port> bash run
+PKG="$VOL/firstboot.pkg"
+if [ -n "${SERVER:-}" ]; then
+    curl -f -o /tmp/firstboot.pkg "${SERVER%/}/firstboot.pkg" && PKG=/tmp/firstboot.pkg
+fi
+installer -pkg "$PKG" -target "/Volumes/Macintosh HD"
 
 "$INSTALLER/Contents/Resources/startosinstall" \
     --agreetolicense --nointeraction --forcequitapps \
