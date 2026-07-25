@@ -99,6 +99,16 @@ If an Apple Silicon machine is in an unknown/locked state, DFU-restore it
 first from a host mac with Apple Configurator (`cfgutil restore`), then start
 from step 1.
 
+### Finding a machine on the network
+
+No need to hunt for the IP: setup.sh sets the hostname (`<prefix>-<serial>`,
+serial is on the bottom label) and enables SSH *early* in first boot, so
+`ssh julia@<prefix>-<serial>.local` works minutes after first boot — even
+while the console still shows Setup Assistant or the login window. To
+discover machines without reading labels: `dns-sd -B _ssh._tcp local.`
+Fallback if mDNS is blocked: `arp -a` on the machine serving the image after
+the mini fetches Xcode.
+
 ### Afterwards (both)
 
 Verify over SSH (`ssh julia@<ip>`): `xcodebuild -version`, `brew --version`,
