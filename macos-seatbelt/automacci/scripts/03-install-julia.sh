@@ -2,5 +2,9 @@
 # Create .bash_profile for juliaup to modify
 sudo -i -u julia touch /Users/julia/.bash_profile
 
-# Install juliaup
-sudo -i -u julia curl -fsSL https://install.julialang.org | sh -s -- -y
+# Install juliaup. The whole pipeline must run as julia — in the old
+#   `sudo -i -u julia curl ... | sh`
+# form only curl ran as julia; the installer itself ran as root and put
+# juliaup in root's home.
+sudo -i -u julia /bin/bash -c \
+    "curl -fsSL https://install.julialang.org | sh -s -- -y"
