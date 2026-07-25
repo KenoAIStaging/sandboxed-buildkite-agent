@@ -24,10 +24,11 @@ touch /private/var/db/.AppleSetupDone
 # config provides SERVER_URL and (optionally) XCODE_ASSET, COMPUTER_NAME_PREFIX
 . "$BASE/config"
 
-# Wait for the network (up to 10 minutes). Try the deploy server first, fall
-# back to apple.com in case the server is only needed for Xcode.
+# Wait for the network (up to 10 minutes). Probe a file that actually exists
+# on the deploy server (bare "/" 404s on index-less file servers); fall back
+# to apple.com in case the server is only needed for Xcode.
 for _ in $(seq 1 60); do
-    curl -fsI --max-time 5 "$SERVER_URL/" >/dev/null 2>&1 && break
+    curl -fsI --max-time 5 "$SERVER_URL/firstboot.pkg" >/dev/null 2>&1 && break
     curl -fsI --max-time 5 https://www.apple.com/ >/dev/null 2>&1 && break
     sleep 10
 done
