@@ -9,7 +9,7 @@ else
     BREW=/usr/local/bin/brew
 fi
 
-sudo -i -u julia "$BREW" install tailscale
+sudo -H -u julia "$BREW" install tailscale
 
 # Register + start the tailscaled launchd system daemon. Do NOT derive the
 # path via `brew --prefix` here: this script runs as root from a LaunchDaemon

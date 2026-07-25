@@ -5,12 +5,12 @@ grep -q '^julia ALL' /etc/sudoers || \
     bash -c "echo julia ALL = NOPASSWD: ALL >> /etc/sudoers"
 
 # Create .bash_profile for juliaup to modify
-sudo -i -u julia touch /Users/julia/.bash_profile
+sudo -H -u julia touch /Users/julia/.bash_profile
 
-# Setup homebrew. NONINTERACTIVE must be set *inside* the sudo — `sudo -i`
-# scrubs the environment, so a leading NONINTERACTIVE=1 never reaches the
-# installer.
-sudo -i -u julia NONINTERACTIVE=1 /bin/bash -c \
+# Setup homebrew. NONINTERACTIVE must be passed *through* sudo (a leading
+# NONINTERACTIVE=1 would be scrubbed from the environment). -H (not -i):
+# login shells break when the home dir is missing/broken, -H just sets HOME.
+sudo -H -u julia NONINTERACTIVE=1 /bin/bash -c \
     "curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh | /bin/bash"
 
 # Add homebrew to profile. Prefix differs by architecture: /opt/homebrew on
@@ -25,7 +25,7 @@ grep -q 'brew shellenv' /Users/julia/.bash_profile || \
 
 # zsh is the login default (and julia's shell), so .zprofile needs it too
 # (PR #57 discussion, maleadt's note 2).
-sudo -i -u julia touch /Users/julia/.zprofile
+sudo -H -u julia touch /Users/julia/.zprofile
 grep -q 'brew shellenv' /Users/julia/.zprofile || \
     (echo; echo "eval \"\$(${BREW} shellenv)\"") >> /Users/julia/.zprofile
 

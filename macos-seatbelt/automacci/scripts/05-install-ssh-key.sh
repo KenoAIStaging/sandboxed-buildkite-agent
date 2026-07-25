@@ -11,7 +11,7 @@ if [ ! -f "$KEY_SRC" ]; then
     echo "buildbot ssh key not found in $REPO; skipping"
     exit 1
 fi
-sudo -i -u julia mkdir -p /Users/julia/.ssh
+sudo -H -u julia mkdir -p /Users/julia/.ssh
 touch /Users/julia/.ssh/authorized_keys
 grep -qsF -f "$KEY_SRC" /Users/julia/.ssh/authorized_keys || \
     cat "$KEY_SRC" >> /Users/julia/.ssh/authorized_keys

@@ -43,7 +43,16 @@ grep -q '^julia ALL' /etc/sudoers || echo 'julia ALL = NOPASSWD: ALL' >>/etc/sud
 if ! id julia >/dev/null 2>&1; then
     sysadminctl -addUser julia -fullName "Julia Hub" -UID 601 -shell /bin/zsh \
         -admin -password "$(cat "$BASE/password")"
-    createhomedir -c -u julia
+fi
+id julia >/dev/null 2>&1 || echo "JULIACI FATAL: julia user creation failed"
+# Guarantee the home dir exists ourselves — createhomedir has been seen not
+# delivering (field: /Users/julia absent, every later script broke or leaked
+# into the invoking user's home via a failing 'sudo -i' login shell).
+if [ ! -d /Users/julia ]; then
+    mkdir -p /Users/julia
+    chown julia:staff /Users/julia
+    createhomedir -c -u julia || true
+    chown -R julia:staff /Users/julia
 fi
 
 # Auto-login as julia (CI jobs want a real GUI session; matches the MDS
