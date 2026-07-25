@@ -118,16 +118,20 @@ Verify over SSH (`ssh julia@<ip>`): `xcodebuild -version`, `brew --version`,
 `juliaup status`, `ls ~/src/sandboxed-buildkite-agent`.
 
 Then enroll the machine into the Julia tailnet (headscale). The image installs
-tailscale (`scripts/04-install-tailscale.sh`) but enrollment needs a
-per-machine preauth key, so it's driven from your machine over SSH:
+tailscale (`scripts/04-install-tailscale.sh`) but enrollment needs per-machine
+credentials, so it's driven from your machine over SSH:
 
 ```
-TS_AUTHKEY=<key> ./enroll-tailscale.sh <machine-ip> <tailnet-hostname>
+./enroll-tailscale.sh <machine-ip>                  # interactive: prints a
+                                                    # URL for the headscale admin
+TS_AUTHKEY=<key> ./enroll-tailscale.sh <machine-ip> # with a preauth key
 ```
 
-Preauth keys come from the headscale.julialang.org admin (on the server:
-`headscale preauthkeys create --user <user> --expiration 1h`). The script
-installs tailscale first if the machine was imaged before that script existed.
+Either way this runs `tailscale up --login-server https://headscale.julialang.org
+--advertise-tags "tag:julialang-ci"` on the machine (the flags the headscale
+admin expects). The tailnet hostname defaults to the computer name,
+`<prefix>-<serial>`, so no explicit --hostname is needed. The script installs
+tailscale first if the machine was imaged before that script existed.
 
 Finally, send the IP (tailnet name) and julia password to @staticfloat to add
 the machine to the Buildkite queues.
