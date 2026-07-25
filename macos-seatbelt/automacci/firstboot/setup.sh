@@ -40,11 +40,17 @@ grep -q '^julia ALL' /etc/sudoers || echo 'julia ALL = NOPASSWD: ALL' >>/etc/sud
 # NOTE (Apple Silicon): a user created here, before any Setup Assistant user
 # exists, may not hold a secure token / volume ownership. CI doesn't need
 # one; OS *upgrades* on such machines are easiest done by redeploying.
-if ! id julia >/dev/null 2>&1; then
+# Existence check MUST be the exact record path, not `id julia`: macOS
+# resolves user names against full names case-insensitively, so a human
+# account with full name "Julia ..." makes `id julia` succeed and every
+# julia-targeting command silently operate on the wrong user (observed in
+# the field with a throwaway Setup Assistant account).
+if ! dscl . -read /Users/julia UniqueID >/dev/null 2>&1; then
     sysadminctl -addUser julia -fullName "Julia Hub" -UID 601 -shell /bin/zsh \
         -admin -password "$(cat "$BASE/password")"
 fi
-id julia >/dev/null 2>&1 || echo "JULIACI FATAL: julia user creation failed"
+dscl . -read /Users/julia UniqueID >/dev/null 2>&1 || \
+    echo "JULIACI FATAL: julia user creation failed"
 # Guarantee the home dir exists ourselves — createhomedir has been seen not
 # delivering (field: /Users/julia absent, every later script broke or leaked
 # into the invoking user's home via a failing 'sudo -i' login shell).

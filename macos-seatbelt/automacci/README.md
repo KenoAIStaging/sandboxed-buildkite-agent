@@ -157,7 +157,10 @@ the machine to the Buildkite queues.
   Data volume and discards pre-placed payload, so deliver via
   `--installpackage` (recovery-time `installer` is validation only; both are
   what `run` now does). Rescue without reimaging: click through Setup
-  Assistant with a throwaway admin (NOT named julia), then
+  Assistant with a throwaway admin — account name AND full name must not
+  contain "julia" in any case (macOS aliases full names to logins, so a
+  full name like "Julia" hijacks every julia-targeting command; use
+  `setup`/`setup`) — then
   `curl -O http://<server>/firstboot.pkg`,
   `sudo installer -pkg firstboot.pkg -target /`, reboot (setup reboots
   itself again when done), and later `sudo sysadminctl -deleteUser
