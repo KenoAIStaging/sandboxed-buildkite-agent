@@ -172,9 +172,15 @@ the machine to the Buildkite queues.
   signing: `PKG_SIGN_ID="Developer ID Installer: ..." ./build-image.sh ...`.
 - **Cmd-R doesn't enter recovery on a used T2 machine**: firmware password
   set by the previous owner; you need it (or an Apple Store) to clear it.
-- **julia user on Apple Silicon has no secure token / volume ownership**:
-  known; CI doesn't need it. For OS upgrades, redeploy the image instead of
-  `softwareupdate`.
+- **julia user has no secure token / volume ownership** (script-created
+  users don't get one): known; CI doesn't need it. On fully-unattended
+  machines nobody holds a token — for OS upgrades, redeploy the image. On
+  machines where a human clicked through Setup Assistant (rescues, Apple
+  Silicon), the throwaway SA user holds the only token and macOS refuses to
+  delete "the last secure token user" — transfer it first, then delete:
+  `sysadminctl -secureTokenOn julia -password <julia-pw> -adminUser
+  <throwaway> -adminPassword <pw>`, then `sysadminctl -deleteUser
+  <throwaway>`. Bonus: that julia is then a volume owner.
 - **Xcode license/first-launch prompts on first build**: should be handled by
   `scripts/00-select-xcode.sh` (`-license accept`, `-runFirstLaunch`); re-run
   it if Xcode was installed manually after deployment.
