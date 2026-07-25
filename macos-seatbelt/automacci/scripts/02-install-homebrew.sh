@@ -22,3 +22,11 @@ else
 fi
 grep -q 'brew shellenv' /Users/julia/.bash_profile || \
     (echo; echo "eval \"\$(${BREW} shellenv)\"") >> /Users/julia/.bash_profile
+
+# The Homebrew installer installs the Command Line Tools and switches the
+# active developer directory to them (`xcode-select --switch
+# /Library/Developer/CommandLineTools`), silently undoing 00-select-xcode.sh.
+# CI needs full Xcode: switch back.
+if [ -d /Applications/Xcode.app ]; then
+    sudo xcode-select -s /Applications/Xcode.app/Contents/Developer/
+fi

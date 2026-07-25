@@ -165,7 +165,11 @@ the machine to the Buildkite queues.
   (`/opt/homebrew`) which is wrong on Intel (`/usr/local`);
   `NONINTERACTIVE=1 sudo -i ...` never reached the Homebrew installer because
   `sudo -i` scrubs the environment; `sudo -i -u julia curl ... | sh` ran the
-  juliaup installer as root (the pipe's right-hand side is not under sudo).
+  juliaup installer as root (the pipe's right-hand side is not under sudo);
+  the Homebrew installer switches xcode-select to the Command Line Tools it
+  installs, undoing 00-select-xcode.sh (02 now switches back); `brew` cannot
+  run as root from a LaunchDaemon ("Error: $HOME must be set") so root-side
+  scripts must use hardcoded brew-adjacent paths, never `brew --prefix`.
 
 ## History
 

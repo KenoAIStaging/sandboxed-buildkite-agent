@@ -11,6 +11,8 @@ fi
 
 sudo -i -u julia "$BREW" install tailscale
 
-# Registers and starts the tailscaled launchd system daemon; idempotent.
-PREFIX="$("$BREW" --prefix)"
-"$PREFIX/bin/tailscaled" install-system-daemon
+# Register + start the tailscaled launchd system daemon. Do NOT derive the
+# path via `brew --prefix` here: this script runs as root from a LaunchDaemon
+# with no $HOME, and brew refuses to run ("Error: $HOME must be set").
+# brew links tailscaled next to brew itself.
+"$(dirname "$BREW")/tailscaled" install-system-daemon

@@ -27,12 +27,16 @@ if [ -z "${TS_AUTHKEY:-}" ]; then
     echo
 fi
 
-# Install if missing (machines imaged before 04-install-tailscale.sh existed).
+# Self-heal: install the formula if missing (machines imaged before
+# 04-install-tailscale.sh existed) and register the system daemon if missing
+# (machines hit by the 04 $HOME-under-root bug). tailscaled is linked next to
+# brew — do not use `brew --prefix` under sudo, root has no $HOME for brew.
 ssh "julia@$IP" '
+    set -e
     BREW=$([ "$(uname -m)" = arm64 ] && echo /opt/homebrew/bin/brew || echo /usr/local/bin/brew)
-    if ! "$BREW" list tailscale >/dev/null 2>&1; then
-        "$BREW" install tailscale
-        sudo "$("$BREW" --prefix)/bin/tailscaled" install-system-daemon
+    "$BREW" list tailscale >/dev/null 2>&1 || "$BREW" install tailscale
+    if [ ! -f /Library/LaunchDaemons/com.tailscale.tailscaled.plist ]; then
+        sudo "$(dirname "$BREW")/tailscaled" install-system-daemon
     fi
 '
 
@@ -41,7 +45,7 @@ ssh "julia@$IP" '
 printf '%s' "$TS_AUTHKEY" | ssh "julia@$IP" '
     set -e
     BREW=$([ "$(uname -m)" = arm64 ] && echo /opt/homebrew/bin/brew || echo /usr/local/bin/brew)
-    PREFIX="$("$BREW" --prefix)"
+    PREFIX="$(dirname "$(dirname "$BREW")")"
     sudo sh -c "umask 077; cat > /private/var/root/ts.authkey"
     sudo "$PREFIX/bin/tailscale" up \
         --login-server '"$LOGIN_SERVER"' \
