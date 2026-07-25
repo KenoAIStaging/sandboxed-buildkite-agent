@@ -110,6 +110,11 @@ julia password to @staticfloat to add the machine to the Buildkite queues.
 - **`startosinstall` in recovery rejects flags or crashes**: the recoveryOS is
   much older than the installer. Reboot with Option-Cmd-R (internet recovery)
   to get the newest recovery environment.
+- **`--eraseinstall cannot be used in conjunction with --volume`**: correct —
+  in recoveryOS you erase first, then install. `run` does exactly that
+  (`diskutil eraseDisk APFS "Macintosh HD" GPT diskN` + `startosinstall
+  --volume`); `--eraseinstall` is only valid from a booted OS, which is why
+  `run-as` (Apple Silicon path) uses it.
 - **firstboot.pkg rejected during install**: `--installpackage` requires
   distribution ("product archive") packages — `build-image.sh` handles this
   via `productbuild`; if you hand-build a package, wrap it the same way.

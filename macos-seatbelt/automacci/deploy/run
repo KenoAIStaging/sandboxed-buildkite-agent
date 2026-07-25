@@ -7,37 +7,40 @@
 #        hdiutil mount http://<server>/juliaci.dmg
 #        /Volumes/JULIACI/run
 #
-# ERASES the target volume and installs macOS + firstboot.pkg.
-# Usage: run [-y] [target-volume-name]   (default target: "Macintosh HD")
+# ERASES the internal disk, then installs macOS + firstboot.pkg onto it.
+# (In recoveryOS `startosinstall --eraseinstall` cannot be combined with
+# --volume, so we erase with diskutil first and plain-install.)
+#
+# Usage: run [-y] [diskN]     (default disk: first internal physical disk)
 set -euo pipefail
 
-VOL="$(cd "$(dirname "$0")" && pwd)"
+# Fixed volume name so this script also works when fetched via curl rather
+# than executed off the mounted image.
+VOL=/Volumes/JULIACI
+[ -d "$VOL" ] || { echo "error: $VOL not mounted — hdiutil mount the dmg first"; exit 1; }
+
 ASSUME_YES=""
 [ "${1:-}" = "-y" ] && { ASSUME_YES=1; shift; }
-TARGET="${1:-Macintosh HD}"
+
+DISK="${1:-$(diskutil list internal physical | sed -n 's|^/dev/\(disk[0-9]*\).*|\1|p' | head -1)}"
+[ -n "$DISK" ] || { echo "error: no internal disk found (diskutil list internal physical)"; exit 1; }
 
 INSTALLERS=("$VOL"/Install\ macOS*.app)
 INSTALLER="${INSTALLERS[0]}"
 [ -d "$INSTALLER" ] || { echo "error: no installer app on $VOL"; exit 1; }
-[ -e "/Volumes/$TARGET" ] || {
-    echo "error: /Volumes/$TARGET not found. If the disk is blank or from an"
-    echo "older install, erase it as APFS named 'Macintosh HD' in Disk Utility"
-    echo "first, or pass the volume name: run [-y] <name>"
-    exit 1
-}
 
-echo "About to ERASE '/Volumes/$TARGET' and install:"
-echo "    $(basename "$INSTALLER") + firstboot.pkg"
+echo "About to ERASE /dev/$DISK:"
+diskutil list "$DISK"
+echo "and install $(basename "$INSTALLER") + firstboot.pkg"
 if [ -z "$ASSUME_YES" ]; then
     printf "Type yes to continue: "
     read -r ANSWER
     [ "$ANSWER" = "yes" ] || exit 1
 fi
 
-# Flags mirror what MDS uses (see its firstboot.sh); the machine reboots into
-# the installer and firstboot.pkg is applied on first boot of the new system.
+diskutil eraseDisk APFS "Macintosh HD" GPT "$DISK"
+
 "$INSTALLER/Contents/Resources/startosinstall" \
     --agreetolicense --nointeraction --forcequitapps \
-    --eraseinstall --newvolumename "Macintosh HD" \
-    --volume "/Volumes/$TARGET" \
+    --volume "/Volumes/Macintosh HD" \
     --installpackage "$VOL/firstboot.pkg"
