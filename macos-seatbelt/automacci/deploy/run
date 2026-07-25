@@ -31,7 +31,8 @@ INSTALLER="${INSTALLERS[0]}"
 
 echo "About to ERASE /dev/$DISK:"
 diskutil list "$DISK"
-echo "and install $(basename "$INSTALLER") + firstboot.pkg"
+# ${x##*/} not basename: recoveryOS shells can lack coreutils on PATH
+echo "and install ${INSTALLER##*/} + firstboot.pkg"
 if [ -z "$ASSUME_YES" ]; then
     printf "Type yes to continue: "
     read -r ANSWER

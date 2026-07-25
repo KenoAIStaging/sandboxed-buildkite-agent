@@ -17,7 +17,9 @@ set -euo pipefail
 [ "$(uname -m)" = arm64 ] || {
     echo "error: this is an Intel mac — deploy it from Recovery with 'run'"; exit 1; }
 
-VOL="$(cd "$(dirname "$0")" && pwd)"
+# fixed path, and no dirname/basename: minimal shells can lack coreutils
+VOL=/Volumes/JULIACI
+[ -d "$VOL" ] || { echo "error: $VOL not mounted — hdiutil mount the dmg first"; exit 1; }
 INSTALLERS=("$VOL"/Install\ macOS*.app)
 INSTALLER="${INSTALLERS[0]}"
 [ -d "$INSTALLER" ] || { echo "error: no installer app on $VOL"; exit 1; }
@@ -32,7 +34,7 @@ printf "Password for %s: " "$OWNER"
 read -rs PASS
 echo
 
-echo "About to ERASE this machine and install $(basename "$INSTALLER") + firstboot.pkg."
+echo "About to ERASE this machine and install ${INSTALLER##*/} + firstboot.pkg."
 printf "Type yes to continue: "
 read -r ANSWER
 [ "$ANSWER" = "yes" ] || exit 1
